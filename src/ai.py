@@ -71,34 +71,49 @@ def generate_report(input_type: str, product_name: str, product_category: str,
                     research_data: str, score_data: dict) -> str:
     from src.prompts import VALIDATION_REPORT_PROMPT
 
-    mvp_section = ""
-    if score_data.get("build_mvp"):
-        features = "\n".join(f"- {f}" for f in score_data.get("mvp_features", []))
-        mvp_section = f"""**Recommended MVP Features**
+    decision = score_data.get("decision", "NO-GO")
+    score = score_data.get("score", 0)
+    decision_line = {
+        "GO": f"Score {score}/10 — This is worth building.",
+        "NO-GO": f"Score {score}/10 — Don't build this.",
+        "PIVOT": f"Score {score}/10 — The idea needs a different angle.",
+    }.get(decision, f"Score {score}/10")
+
+    features = "\n".join(f"- {f}" for f in score_data.get("mvp_features", []))
+    mvp_section = f"""**Build this:**
 {features}
 
-**Scope**
-{score_data.get('mvp_scope', '')}
+**Scope:** {score_data.get('mvp_scope', '')}
 
-**Launch Strategy**
-{score_data.get('mvp_launch_strategy', '')}"""
-    else:
-        mvp_section = "_Not recommended at this stage given current validation signals._"
+**Launch channel:** {score_data.get('mvp_launch_channel', '')}"""
 
     prompt = VALIDATION_REPORT_PROMPT.format(
-        input_type=input_type,
         product_name=product_name,
         product_category=product_category,
         core_problem=core_problem,
         target_audience=target_audience,
         keywords=", ".join(keywords),
         research_data=research_data,
-        score=score_data.get("score", 0),
-        decision=score_data.get("decision", "NO-GO"),
+        score=score,
+        decision=decision,
+        decision_line=decision_line,
         confidence=score_data.get("confidence", "Low"),
+        why_now=score_data.get("why_now", ""),
+        why_now_strength=score_data.get("why_now_strength", "Moderate"),
+        why_this_market=score_data.get("why_this_market", ""),
+        why_not=score_data.get("why_not", ""),
+        best_entry_point=score_data.get("best_entry_point", ""),
+        founder_fit_note=score_data.get("founder_fit_note", ""),
+        distribution_difficulty=score_data.get("distribution_difficulty", "Medium"),
+        distribution_note=score_data.get("distribution_note", ""),
+        mvp_launch_channel=score_data.get("mvp_launch_channel", ""),
+        time_to_first_revenue=score_data.get("time_to_first_revenue", ""),
+        time_to_revenue_note=score_data.get("time_to_revenue_note", ""),
+        would_you_build_it=score_data.get("would_you_build_it", "Maybe"),
+        would_you_build_it_reason=score_data.get("would_you_build_it_reason", ""),
         mvp_section=mvp_section,
     )
-    return chat("You are an expert startup analyst writing a validation report.", prompt, temperature=0.4)
+    return chat("You are a brutally honest startup advisor helping a founder make a go/no-go decision.", prompt, temperature=0.4)
 
 
 def generate_brd(product_name: str, product_category: str, core_problem: str,
