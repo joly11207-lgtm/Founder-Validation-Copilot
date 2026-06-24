@@ -17,146 +17,195 @@ Respond ONLY with valid JSON in this exact format:
 Be specific and concise. Keywords should be search-friendly terms for market research."""
 
 
-SCORE_PROMPT = """You are a brutally honest startup advisor with pattern recognition across thousands of companies.
+SCORE_PROMPT = """You are a startup advisor who has seen thousands of pitches. You are direct, opinionated, and honest.
+Your only job here is to produce structured data that will drive a founder decision report.
 
 Product: {product_name}
 Category: {product_category}
 Core Problem: {core_problem}
 Target Audience: {target_audience}
-Research Summary: {research_summary}
+Research: {research_summary}
 
-Respond ONLY with valid JSON:
+Respond ONLY with valid JSON. Every string field must be one sentence — direct, specific, no hedging.
+
 {{
   "score": <integer 0-10>,
   "decision": "<GO | NO-GO | PIVOT>",
   "confidence": "<High | Medium | Low>",
+
+  "snapshot_problem": "<one sentence: what pain this solves and how acute it is>",
+  "snapshot_market": "<one sentence: market size or growth signal — cite a real number or trend if evidence exists>",
+  "snapshot_competition": "<one sentence: competitive reality — crowded, fragmented, or open?>",
+  "snapshot_timing": "<one sentence: is now the right moment or is this early/late?>",
+  "snapshot_monetization": "<one sentence: is there evidence people pay for this?>",
+
+  "score_market_demand": <integer 0-10>,
+  "score_competition": <integer 0-10>,
+  "score_timing": <integer 0-10>,
+  "score_monetization": <integer 0-10>,
+  "score_distribution": <integer 0-10>,
+
   "would_you_build_it": "<Yes | No | Maybe>",
-  "would_you_build_it_reason": "<one direct sentence — no hedging>",
-  "why_now": "<one sentence: what changed recently that makes this viable now>",
-  "why_now_strength": "<Strong | Moderate | Weak>",
-  "why_this_market": "<one sentence: the single best reason this market is worth entering>",
-  "why_not": "<the single biggest reason NOT to build this — be specific, not generic>",
-  "best_entry_point": "<one sentence: the most defensible, fastest-to-revenue wedge>",
-  "founder_fit_note": "<one sentence: what kind of founder wins here and why>",
+  "would_you_build_it_reason": "<one sentence — personal, direct, no corporate language>",
+  "would_you_build_it_condition": "<if Maybe or No: the one thing that would change your mind, or empty string>",
+
+  "best_entry_point": "<one sentence: specific customer segment + use case + motion that reaches revenue fastest>",
+  "entry_first_10_customers": "<one sentence: exactly who they are, where to find them, what to say>",
+  "entry_unfair_advantage": "<one sentence: what gives a founder an edge at this entry point>",
+
+  "founder_fit_archetype": "<2-4 words: e.g. 'Ex-enterprise sales', 'Technical solo founder', 'Domain expert'>",
+  "founder_fit_must_have": "<one sentence: the background or skill that is non-negotiable to win here>",
+  "founder_fit_nice_to_have": "<one sentence: what accelerates but is not required>",
+  "founder_fit_red_flag": "<one sentence: the founder profile that will fail here>",
+
   "distribution_difficulty": "<Easy | Medium | Hard | Very Hard>",
-  "distribution_note": "<one sentence on why>",
-  "time_to_first_revenue": "<e.g. 2-4 weeks | 1-3 months | 6+ months>",
-  "time_to_revenue_note": "<one sentence on what drives that timeline>",
-  "mvp_features": ["feature1", "feature2", "feature3"],
-  "mvp_scope": "<one sentence: what you actually build in 2 weeks>",
-  "mvp_launch_channel": "<the single best launch channel for first 100 users>"
+  "distribution_best_channel": "<name of single best first channel>",
+  "distribution_why": "<one sentence: why that channel and why it works for this specific product>",
+  "distribution_biggest_risk": "<one sentence: the thing that makes distribution fail here>",
+
+  "time_to_first_revenue": "<specific range: e.g. '2–4 weeks' | '1–3 months' | '3–6 months' | '6+ months'>",
+  "time_to_revenue_driver": "<one sentence: the single variable that determines how fast revenue comes>",
+  "time_to_revenue_blocker": "<one sentence: what slows it down or stops it entirely>",
+
+  "why_now_signal": "<one sentence: the specific recent change — model capability, regulation, behavior shift, platform shift — that opens this window>",
+  "why_now_urgency": "<Strong | Moderate | Weak>",
+  "why_now_expiry": "<one sentence: when does this window close, or how long does the advantage last?>",
+
+  "why_not_primary": "<the single most likely cause of failure — specific to this market, not generic>",
+  "why_not_secondary": "<second most likely failure mode>",
+  "why_not_fatal": "<true | false — is the primary risk fatal or navigable?>",
+
+  "final_verdict": "<2-3 sentences max — speak directly to the founder, not about them. Tell them what you'd tell a close friend.>"
 }}"""
 
 
-VALIDATION_REPORT_PROMPT = """You are a brutally honest startup advisor. Your job is not to summarize research — it is to help a founder decide whether to spend the next 2 years of their life on this.
+VALIDATION_REPORT_PROMPT = """You are a startup advisor writing a founder decision report. Not a research report. Not a summary. A decision tool.
 
-Be direct. Be specific. Use evidence from the research. No hedging. No filler sentences. No "it depends."
+The founder reading this is trying to answer one question: should I spend the next 3 months of my life on this?
 
-Every section should feel like advice from a trusted co-founder who has seen this exact market before.
+Rules:
+- Write in second person ("you", not "the founder")
+- Every sentence must earn its place. Cut anything that doesn't help them decide.
+- No bullet walls. Max 3 bullets per section.
+- No hedging. No "it depends". Make a call.
+- Use evidence from the research data. Cite specifics, not vibes.
+- The report must feel like advice from a trusted co-founder, not a consultant.
 
-## CONTEXT
+## INPUT
 Product: {product_name}
 Category: {product_category}
 Problem: {core_problem}
 Audience: {target_audience}
-Keywords: {keywords}
-
-## RESEARCH DATA
-{research_data}
-
-## SCORING
-Score: {score}/10
-Decision: {decision}
-Confidence: {confidence}
+Research: {research_data}
 
 ---
 
-Generate the founder decision report using this EXACT structure. Write in plain, direct English. No corporate language. No bullet-point walls. Max 3 bullets per section where bullets are used.
+Generate the report using this EXACT structure and nothing else.
 
 ---
 
-# {product_name}
+# {product_name} — Founder Decision Report
 
-**{decision_line}**
+## 1. Founder Snapshot
 
----
-
-## ⏰ Why Now?
-*What has changed recently that makes this the right moment — or why timing is working against you.*
-
-{why_now}
-
-**Timing signal:** {why_now_strength}
-
----
-
-## 📈 Why This Market?
-*The single most compelling reason this market is worth a founder's time.*
-
-{why_this_market}
+| | |
+|---|---|
+| **Problem** | {snapshot_problem} |
+| **Market** | {snapshot_market} |
+| **Competition** | {snapshot_competition} |
+| **Timing** | {snapshot_timing} |
+| **Monetization** | {snapshot_monetization} |
 
 ---
 
-## ⚠️ Why Not?
-*The real reason this might fail. Not generic risk. The specific thing that kills companies in this space.*
+## 2. Opportunity Score
 
-{why_not}
+| Dimension | Score |
+|---|---|
+| Market Demand | {score_market_demand}/10 |
+| Competition | {score_competition}/10 |
+| Timing | {score_timing}/10 |
+| Monetization | {score_monetization}/10 |
+| Distribution | {score_distribution}/10 |
+| **Overall** | **{score}/10** |
 
 ---
 
-## 🎯 Best Entry Point
-*The wedge. The specific customer, use case, and motion that gets you to revenue fastest with the least competition.*
+## 3. Would I Build This?
+
+**{would_you_build_it}** — {would_you_build_it_reason}
+
+{would_you_build_it_condition_block}
+
+---
+
+## 4. Best Entry Point
 
 {best_entry_point}
 
-**First 10 customers:** [Who exactly, how to reach them, what you say]
+**Your first 10 customers:** {entry_first_10_customers}
+
+**Your edge:** {entry_unfair_advantage}
 
 ---
 
-## 🧠 Founder Fit
-*What kind of founder wins here. What unfair advantages matter. What background is table stakes.*
+## 5. Founder Fit
 
-{founder_fit_note}
+**Archetype that wins:** {founder_fit_archetype}
 
-**Ask yourself:** [One honest question the founder needs to answer about themselves]
+**Must have:** {founder_fit_must_have}
 
----
+**Nice to have:** {founder_fit_nice_to_have}
 
-## 📣 Distribution Difficulty
-**{distribution_difficulty}**
-
-{distribution_note}
-
-**Best first channel:** {mvp_launch_channel}
+**Red flag:** {founder_fit_red_flag}
 
 ---
 
-## 💵 Time to Revenue
+## 6. Distribution Difficulty
+
+**{distribution_difficulty}** — via {distribution_best_channel}
+
+{distribution_why}
+
+**Biggest distribution risk:** {distribution_biggest_risk}
+
+---
+
+## 7. Time to First Revenue
+
 **{time_to_first_revenue}**
 
-{time_to_revenue_note}
+{time_to_revenue_driver}
 
-**What unlocks it:** [The one thing that has to be true before someone pays]
-
----
-
-## 🤔 Would You Build It?
-**{would_you_build_it}** — {would_you_build_it_reason}
+**What slows it:** {time_to_revenue_blocker}
 
 ---
 
-## 🏗️ If You GO: Build This in 2 Weeks
+## 8. Why Now?
 
-{mvp_section}
+**Signal strength: {why_now_urgency}**
+
+{why_now_signal}
+
+**Window:** {why_now_expiry}
 
 ---
 
-## 🎯 Decision
+## 9. Why Not?
 
-**Score: {score}/10 — {decision}**
-Confidence: {confidence}
+**Primary risk:** {why_not_primary}
 
-[2-3 sentences. Final verdict. Speak directly to the founder. Tell them what you'd tell a friend.]
+**Secondary risk:** {why_not_secondary}
+
+{why_not_fatal_block}
+
+---
+
+## 10. Final Decision
+
+**{decision} — {score}/10** *(Confidence: {confidence})*
+
+{final_verdict}
 
 ---
 *Founder Validation Copilot*"""

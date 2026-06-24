@@ -39,7 +39,6 @@ def chat(system_prompt: str, user_message: str, temperature: float = 0.3) -> str
 
 def chat_json(system_prompt: str, user_message: str) -> dict:
     raw = chat(system_prompt, user_message, temperature=0.1)
-    # Strip markdown code fences if present
     raw = re.sub(r"^```(?:json)?\s*", "", raw.strip())
     raw = re.sub(r"\s*```$", "", raw.strip())
     return json.loads(raw)
@@ -55,7 +54,7 @@ def classify_and_extract(user_input: str) -> dict:
 def score_opportunity(product_name: str, product_category: str, core_problem: str,
                       target_audience: str, research_summary: str) -> dict:
     from src.prompts import SCORE_PROMPT
-    system = "You are an expert startup analyst. Always respond with valid JSON only."
+    system = "You are a startup advisor. Always respond with valid JSON only. Every string value must be one sentence."
     prompt = SCORE_PROMPT.format(
         product_name=product_name,
         product_category=product_category,
@@ -71,49 +70,81 @@ def generate_report(input_type: str, product_name: str, product_category: str,
                     research_data: str, score_data: dict) -> str:
     from src.prompts import VALIDATION_REPORT_PROMPT
 
-    decision = score_data.get("decision", "NO-GO")
-    score = score_data.get("score", 0)
-    decision_line = {
-        "GO": f"Score {score}/10 — This is worth building.",
-        "NO-GO": f"Score {score}/10 — Don't build this.",
-        "PIVOT": f"Score {score}/10 — The idea needs a different angle.",
-    }.get(decision, f"Score {score}/10")
+    s = score_data
 
-    features = "\n".join(f"- {f}" for f in score_data.get("mvp_features", []))
-    mvp_section = f"""**Build this:**
-{features}
+    # Conditional blocks pre-rendered so the template stays clean
+    condition = s.get("would_you_build_it_condition", "")
+    would_you_build_it_condition_block = (
+        f"*What would change my mind: {condition}*" if condition else ""
+    )
 
-**Scope:** {score_data.get('mvp_scope', '')}
-
-**Launch channel:** {score_data.get('mvp_launch_channel', '')}"""
+    fatal = str(s.get("why_not_fatal", "false")).lower() == "true"
+    why_not_fatal_block = (
+        "**This risk is likely fatal.** Proceed only if you have a specific plan to neutralise it."
+        if fatal else
+        "This risk is navigable with the right approach."
+    )
 
     prompt = VALIDATION_REPORT_PROMPT.format(
         product_name=product_name,
         product_category=product_category,
         core_problem=core_problem,
         target_audience=target_audience,
-        keywords=", ".join(keywords),
         research_data=research_data,
-        score=score,
-        decision=decision,
-        decision_line=decision_line,
-        confidence=score_data.get("confidence", "Low"),
-        why_now=score_data.get("why_now", ""),
-        why_now_strength=score_data.get("why_now_strength", "Moderate"),
-        why_this_market=score_data.get("why_this_market", ""),
-        why_not=score_data.get("why_not", ""),
-        best_entry_point=score_data.get("best_entry_point", ""),
-        founder_fit_note=score_data.get("founder_fit_note", ""),
-        distribution_difficulty=score_data.get("distribution_difficulty", "Medium"),
-        distribution_note=score_data.get("distribution_note", ""),
-        mvp_launch_channel=score_data.get("mvp_launch_channel", ""),
-        time_to_first_revenue=score_data.get("time_to_first_revenue", ""),
-        time_to_revenue_note=score_data.get("time_to_revenue_note", ""),
-        would_you_build_it=score_data.get("would_you_build_it", "Maybe"),
-        would_you_build_it_reason=score_data.get("would_you_build_it_reason", ""),
-        mvp_section=mvp_section,
+        score=s.get("score", 0),
+        decision=s.get("decision", "NO-GO"),
+        confidence=s.get("confidence", "Low"),
+
+        snapshot_problem=s.get("snapshot_problem", ""),
+        snapshot_market=s.get("snapshot_market", ""),
+        snapshot_competition=s.get("snapshot_competition", ""),
+        snapshot_timing=s.get("snapshot_timing", ""),
+        snapshot_monetization=s.get("snapshot_monetization", ""),
+
+        score_market_demand=s.get("score_market_demand", 0),
+        score_competition=s.get("score_competition", 0),
+        score_timing=s.get("score_timing", 0),
+        score_monetization=s.get("score_monetization", 0),
+        score_distribution=s.get("score_distribution", 0),
+
+        would_you_build_it=s.get("would_you_build_it", "Maybe"),
+        would_you_build_it_reason=s.get("would_you_build_it_reason", ""),
+        would_you_build_it_condition_block=would_you_build_it_condition_block,
+
+        best_entry_point=s.get("best_entry_point", ""),
+        entry_first_10_customers=s.get("entry_first_10_customers", ""),
+        entry_unfair_advantage=s.get("entry_unfair_advantage", ""),
+
+        founder_fit_archetype=s.get("founder_fit_archetype", ""),
+        founder_fit_must_have=s.get("founder_fit_must_have", ""),
+        founder_fit_nice_to_have=s.get("founder_fit_nice_to_have", ""),
+        founder_fit_red_flag=s.get("founder_fit_red_flag", ""),
+
+        distribution_difficulty=s.get("distribution_difficulty", "Medium"),
+        distribution_best_channel=s.get("distribution_best_channel", ""),
+        distribution_why=s.get("distribution_why", ""),
+        distribution_biggest_risk=s.get("distribution_biggest_risk", ""),
+
+        time_to_first_revenue=s.get("time_to_first_revenue", ""),
+        time_to_revenue_driver=s.get("time_to_revenue_driver", ""),
+        time_to_revenue_blocker=s.get("time_to_revenue_blocker", ""),
+
+        why_now_signal=s.get("why_now_signal", ""),
+        why_now_urgency=s.get("why_now_urgency", "Moderate"),
+        why_now_expiry=s.get("why_now_expiry", ""),
+
+        why_not_primary=s.get("why_not_primary", ""),
+        why_not_secondary=s.get("why_not_secondary", ""),
+        why_not_fatal_block=why_not_fatal_block,
+
+        final_verdict=s.get("final_verdict", ""),
     )
-    return chat("You are a brutally honest startup advisor helping a founder make a go/no-go decision.", prompt, temperature=0.4)
+
+    return chat(
+        "You are a startup advisor writing a founder decision report. Be direct and specific. Write in second person.",
+        prompt,
+        temperature=0.3,
+    )
 
 
 def generate_brd(product_name: str, product_category: str, core_problem: str,
